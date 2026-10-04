@@ -8,8 +8,9 @@ import { loadConfig } from '../server/env.js'
 import { connect, describeTarget } from '../server/db.js'
 import { migrate } from '../server/migrate.js'
 import { nodeListener } from '../server/node-adapter.js'
+import { loadLocalEnv, realSleep, systemClock, unconfiguredPush } from '../server/runtime.js'
 
-try { process.loadEnvFile('.env.local') } catch { /* optional */ }
+loadLocalEnv()
 process.env.RP_ID ||= 'localhost'
 process.env.ORIGIN ||= 'http://localhost:5173'
 process.env.SETUP_CODE ||= 'dev-setup-code'
@@ -27,9 +28,7 @@ await migrate(db, { log: m => console.log('migrated', m) })
 
 const handler = createHandler({
   db, config,
-  clock: { now: () => Date.now() },
-  sleep: ms => new Promise(resolve => setTimeout(resolve, ms)),
-  push: { send: async () => { throw new Error('push is not configured yet') } }
+  clock: systemClock, sleep: realSleep, push: unconfiguredPush
 })
 const port = Number(process.env.PORT) || 3000
 http.createServer(nodeListener(handler)).listen(port, '127.0.0.1', () => {

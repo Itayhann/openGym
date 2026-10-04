@@ -1,4 +1,6 @@
 /* Adapts the handler to Node's (req, res) — used by the Vercel function and the local dev server. */
+import { reply } from './handler.js'
+
 async function readBody(req) {
   // Vercel's Node runtime may already have consumed the stream and exposed the parsed body.
   if (req.body !== undefined && req.body !== null) {
@@ -18,7 +20,7 @@ export function nodeListener(handle) {
       out = await handle({ method: req.method, url: req.url, headers: req.headers, body: await readBody(req) })
     } catch (e) {
       console.error('unhandled', e)
-      out = { status: 500, headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }, body: '{"error":"server error"}' }
+      out = reply(500, { error: 'server error' })
     }
     res.statusCode = out.status
     for (const [k, v] of Object.entries(out.headers || {})) res.setHeader(k, v)

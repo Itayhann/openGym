@@ -17,8 +17,8 @@ export async function migrate(db, { dir = DIR, log = () => {} } = {}) {
     if (done.has(file)) continue
     const sql = await fs.readFile(path.join(dir, file), 'utf8')
     const record = `INSERT INTO schema_migrations (name) VALUES ('${file.replace(/'/g, "''")}');`
-    await db.exec(`BEGIN;\n${sql}\n${record}\nCOMMIT;`).catch(async e => {
-      await db.exec('ROLLBACK').catch(() => {})
+    // One multi-statement batch is a single implicit transaction, so a failure leaves nothing applied.
+    await db.exec(`BEGIN;\n${sql}\n${record}\nCOMMIT;`).catch(e => {
       throw new Error(`migration ${file} failed: ${e.message}`)
     })
     log(`applied ${file}`)

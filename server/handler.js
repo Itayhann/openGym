@@ -26,6 +26,8 @@ export function createHandler(deps) {
     let body = {}
     if (raw) {
       try { body = JSON.parse(raw) } catch { return reply(400, { error: 'bad json' }) }
+      // Routes read fields off `body`, so anything but a JSON object is refused here.
+      if (body === null || typeof body !== 'object' || Array.isArray(body)) return reply(400, { error: 'bad json' })
     }
 
     const route = routes[req.method + ' ' + url.pathname]
