@@ -8,7 +8,11 @@
 
 Plan your week, run guided workouts, track every set and your body weight over time —
 on your phone, synced across devices, behind your own passkey login.
-No account on someone else's server, no subscription, no ads. Just `docker compose up`.
+No account on someone else's server, no subscription, no ads.
+
+> [!NOTE]
+> **Production Deployment on Vercel + Neon**: This fork is deployed on **Vercel + Neon Postgres** for a single owner with passkey authentication and web push notifications.
+> For deployment, registration, re-enrolment, snapshot recovery, and backup instructions, see the **[Owner Runbook](docs/RUNBOOK.md)**.
 
 <br>
 
