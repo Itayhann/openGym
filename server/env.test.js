@@ -38,5 +38,23 @@ describe('loadConfig', () => {
     expect(loadConfig({ ...base, MAX_PROFILES: 'lots' }).maxProfiles).toBe(1)
     expect(loadConfig({ ...base, MAX_PROFILES: '0' }).maxProfiles).toBe(1)
   })
+
+  it('reads cron and vapid variables with trimming and default subject', () => {
+    const c = loadConfig({
+      ...base,
+      CRON_SECRET: '  cron-sec  ',
+      VAPID_PUBLIC_KEY: '  pub-key  ',
+      VAPID_SUBJECT: '  mailto:me@test.com  '
+    })
+    expect(c.cronSecret).toBe('cron-sec')
+    expect(c.vapidPublicKey).toBe('pub-key')
+    expect(c.vapidSubject).toBe('mailto:me@test.com')
+
+    const cDefault = loadConfig(base)
+    expect(cDefault.cronSecret).toBeNull()
+    expect(cDefault.vapidPublicKey).toBeNull()
+    expect(cDefault.vapidSubject).toBe('mailto:admin@localhost')
+  })
 })
+
 
