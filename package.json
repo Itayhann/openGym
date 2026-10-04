@@ -8,6 +8,7 @@
   "scripts": {
     "dev:api": "node scripts/dev-api.mjs",
     "migrate": "node scripts/migrate.mjs",
+    "break-glass": "node scripts/break-glass-reset.mjs",
     "test": "vitest run",
     "test:all": "vitest run && npm --prefix frontend test",
     "build": "npm --prefix frontend run build"
