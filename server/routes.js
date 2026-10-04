@@ -19,6 +19,56 @@ async function refuseAdmin({ req, db, clock, config, reply }) {
   return reply(403, { error: 'forbidden' })
 }
 
+export async function sendPushToProfile(db, push, profileId, payload) {
+  const { rows: subs } = await db.query(
+    'SELECT endpoint, p256dh, auth FROM push_subscriptions WHERE profile_id = $1',
+    [profileId]
+  )
+  if (!subs.length) return
+  await Promise.all(subs.map(async sub => {
+    try {
+      await push.send(
+        { endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } },
+        payload
+      )
+    } catch (e) {
+      if (e?.statusCode === 404 || e?.statusCode === 410) {
+        await db.query('DELETE FROM push_subscriptions WHERE endpoint = $1', [sub.endpoint])
+      }
+    }
+  }))
+}
+
+export function verifyCronAuth(req, config) {
+  if (!config.cronSecret) return false
+  const auth = req.headers.authorization || req.headers.Authorization
+  if (!auth) return false
+  const expected = `Bearer ${config.cronSecret}`
+  if (auth.length !== expected.length) return false
+  return crypto.timingSafeEqual(Buffer.from(auth), Buffer.from(expected))
+}
+
+async function handleCronSweep({ req, db, clock, push, config, reply }) {
+  if (!verifyCronAuth(req, config)) return reply(401, { error: 'unauthorized' })
+  const nowIso = new Date(clock.now()).toISOString()
+  const { rows } = await db.query(
+    'DELETE FROM rest_alerts WHERE due_at <= $1 RETURNING profile_id',
+    [nowIso]
+  )
+  const sent = new Set()
+  for (const row of rows) {
+    if (!sent.has(row.profile_id)) {
+      sent.add(row.profile_id)
+      await sendPushToProfile(db, push, row.profile_id, {
+        title: 'Rest over 💪',
+        body: 'Time for your next set.',
+        tag: 'rest-timer'
+      })
+    }
+  }
+  return reply(200, { ok: true })
+}
+
 export const routes = {
   'GET /api/health': async ({ db, clock, reply }) => {
     try { await db.query('SELECT 1') } catch (e) {
@@ -323,6 +373,96 @@ export const routes = {
       [profile.id, body.state]
     )
     return reply(200, { ok: true, ts: body.state._ts || null })
+  },
+
+  'GET /api/push/public-key': async ({ config, reply }) => {
+    return reply(200, { key: config.vapidPublicKey || '' })
+  },
+
+  'POST /api/push/subscribe': async ({ req, db, clock, config, body, reply }) => {
+    const profile = await readSession(req, { db, clock, config })
+    if (!profile) return reply(401, { error: 'not signed in' })
+    const sub = body?.subscription
+    if (!sub?.endpoint || !sub?.keys?.p256dh || !sub?.keys?.auth) {
+      return reply(400, { error: 'invalid subscription' })
+    }
+    await db.query(
+      `INSERT INTO push_subscriptions (endpoint, profile_id, p256dh, auth, created_at)
+       VALUES ($1, $2, $3, $4, now())
+       ON CONFLICT (endpoint) DO UPDATE SET profile_id = EXCLUDED.profile_id, p256dh = EXCLUDED.p256dh, auth = EXCLUDED.auth, created_at = EXCLUDED.created_at`,
+      [sub.endpoint, profile.id, sub.keys.p256dh, sub.keys.auth]
+    )
+    return reply(200, { ok: true })
+  },
+
+  'POST /api/push/unsubscribe': async ({ req, db, clock, config, body, reply }) => {
+    const profile = await readSession(req, { db, clock, config })
+    if (!profile) return reply(401, { error: 'not signed in' })
+    const endpoint = body?.endpoint
+    if (endpoint) {
+      await db.query('DELETE FROM push_subscriptions WHERE profile_id = $1 AND endpoint = $2', [profile.id, endpoint])
+    }
+    return reply(200, { ok: true })
+  },
+
+  'POST /api/push/test': async ({ req, db, clock, push, config, reply }) => {
+    const profile = await readSession(req, { db, clock, config })
+    if (!profile) return reply(401, { error: 'not signed in' })
+    await sendPushToProfile(db, push, profile.id, {
+      title: 'openGym',
+      body: 'Test notification ✅ — this is what alerts look like.',
+      tag: 'test'
+    })
+    return reply(200, { ok: true })
+  },
+
+  'POST /api/push/rest-timer': async ({ req, db, clock, sleep, push, config, body, reply }) => {
+    const profile = await readSession(req, { db, clock, config })
+    if (!profile) return reply(401, { error: 'not signed in' })
+    const sec = Math.round(Number(body?.seconds))
+    if (!Number.isFinite(sec) || sec <= 0) return reply(400, { error: 'seconds required' })
+
+    const alertId = crypto.randomBytes(16).toString('base64url')
+    const dueAt = new Date(clock.now() + sec * 1000).toISOString()
+
+    await db.query(
+      `INSERT INTO rest_alerts (profile_id, id, due_at, created_at)
+       VALUES ($1, $2, $3, now())
+       ON CONFLICT (profile_id) DO UPDATE SET id = EXCLUDED.id, due_at = EXCLUDED.due_at, created_at = EXCLUDED.created_at`,
+      [profile.id, alertId, dueAt]
+    )
+
+    if (sec <= 600) {
+      await sleep(sec * 1000)
+      const { rows } = await db.query(
+        'DELETE FROM rest_alerts WHERE profile_id = $1 AND id = $2 RETURNING *',
+        [profile.id, alertId]
+      )
+      if (rows.length) {
+        await sendPushToProfile(db, push, profile.id, {
+          title: 'Rest over 💪',
+          body: 'Time for your next set.',
+          tag: 'rest-timer'
+        })
+      }
+    }
+
+    return reply(200, { ok: true })
+  },
+
+  'POST /api/push/rest-timer/cancel': async ({ req, db, clock, config, reply }) => {
+    const profile = await readSession(req, { db, clock, config })
+    if (!profile) return reply(401, { error: 'not signed in' })
+    await db.query('DELETE FROM rest_alerts WHERE profile_id = $1', [profile.id])
+    return reply(200, { ok: true })
+  },
+
+  'GET /api/cron/sweep': async ({ req, db, clock, push, config, reply }) => {
+    return handleCronSweep({ req, db, clock, push, config, reply })
+  },
+
+  'POST /api/cron/sweep': async ({ req, db, clock, push, config, reply }) => {
+    return handleCronSweep({ req, db, clock, push, config, reply })
   },
 
   // Admin routes always refuse: 401 when signed out, 403 when signed in.

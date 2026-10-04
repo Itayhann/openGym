@@ -72,6 +72,9 @@ export async function createTestApp({ config = {}, clock = fakeClock(), db } = {
     maxProfiles: 1,
     sessionSecret: 'test-session-secret-at-least-32-chars-long',
     sessionDays: 90,
+    cronSecret: 'test-cron-secret',
+    vapidPublicKey: 'test-vapid-public-key',
+    vapidSubject: 'mailto:admin@test.com',
     ...config
   }
   const handler = createHandler({ db, clock, sleep, push, config: fullConfig })

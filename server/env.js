@@ -15,6 +15,9 @@ export function loadConfig(env = process.env) {
     rpName: env.RP_NAME?.trim() || 'openGym',
     // Unset or blank means registration is closed, never open.
     setupCode: env.SETUP_CODE?.trim() || null,
-    maxProfiles: maxProfiles >= 1 ? maxProfiles : 1
+    maxProfiles: maxProfiles >= 1 ? maxProfiles : 1,
+    cronSecret: env.CRON_SECRET?.trim() || null,
+    vapidPublicKey: env.VAPID_PUBLIC_KEY?.trim() || null,
+    vapidSubject: env.VAPID_SUBJECT?.trim() || 'mailto:admin@localhost'
   }
 }
