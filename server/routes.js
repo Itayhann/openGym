@@ -152,6 +152,45 @@ async function handleCronSweep({ req, db, clock, push, config, reply }) {
   return reply(200, { ok: true })
 }
 
+async function handleCronSnapshot({ req, db, clock, config, reply }) {
+  if (!verifyCronAuth(req, config)) return reply(401, { error: 'unauthorized' })
+
+  // 1. Snapshot each profile whose data has changed since its latest snapshot
+  const { rows: profiles } = await db.query('SELECT id FROM profiles')
+  for (const p of profiles) {
+    const { rows: dataRows } = await db.query(
+      'SELECT state FROM profile_data WHERE profile_id = $1',
+      [p.id]
+    )
+    if (!dataRows.length) continue
+    const liveState = dataRows[0].state
+
+    const { rows: snapRows } = await db.query(
+      'SELECT state FROM profile_snapshots WHERE profile_id = $1 ORDER BY created_at DESC LIMIT 1',
+      [p.id]
+    )
+    const latestSnap = snapRows[0]
+    if (latestSnap && JSON.stringify(liveState) === JSON.stringify(latestSnap.state)) {
+      continue // unchanged
+    }
+
+    const nowIso = new Date(clock.now()).toISOString()
+    await db.query(
+      'INSERT INTO profile_snapshots (profile_id, state, created_at) VALUES ($1, $2, $3)',
+      [p.id, liveState, nowIso]
+    )
+  }
+
+  // 2. Prune snapshots older than 30 days
+  const thirtyDaysAgoIso = new Date(clock.now() - 30 * 86400 * 1000).toISOString()
+  await db.query(
+    'DELETE FROM profile_snapshots WHERE created_at < $1',
+    [thirtyDaysAgoIso]
+  )
+
+  return reply(200, { ok: true })
+}
+
 export const routes = {
   'GET /api/health': async ({ db, clock, reply }) => {
     try { await db.query('SELECT 1') } catch (e) {
@@ -546,6 +585,14 @@ export const routes = {
 
   'POST /api/cron/sweep': async ({ req, db, clock, push, config, reply }) => {
     return handleCronSweep({ req, db, clock, push, config, reply })
+  },
+
+  'GET /api/cron/snapshot': async ({ req, db, clock, config, reply }) => {
+    return handleCronSnapshot({ req, db, clock, config, reply })
+  },
+
+  'POST /api/cron/snapshot': async ({ req, db, clock, config, reply }) => {
+    return handleCronSnapshot({ req, db, clock, config, reply })
   },
 
   // Admin routes always refuse: 401 when signed out, 403 when signed in.
