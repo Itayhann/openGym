@@ -15,5 +15,9 @@
   ],
   "functions": {
     "api/index.js": { "maxDuration": 800 }
-  }
+  },
+  "crons": [
+    { "path": "/api/cron/sweep", "schedule": "* * * * *" },
+    { "path": "/api/cron/snapshot", "schedule": "0 3 * * *" }
+  ]
 }
