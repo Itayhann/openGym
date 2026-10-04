@@ -2,12 +2,16 @@
  * here (set in Vercel's project settings in production); nothing falls back to a hard-coded host,
  * because a passkey is bound to its hostname and a wrong guess would silently lock the owner out. */
 export function loadConfig(env = process.env) {
-  const missing = ['RP_ID', 'ORIGIN'].filter(k => !env[k]?.trim())
+  const missing = ['RP_ID', 'ORIGIN', 'SESSION_SECRET'].filter(k => !env[k]?.trim())
   if (missing.length) throw new Error(`missing required environment variable(s): ${missing.join(', ')}`)
   const maxProfiles = Math.floor(Number(env.MAX_PROFILES))
+  const parsedDays = Math.floor(Number(env.SESSION_DAYS))
+  const sessionDays = parsedDays >= 1 ? parsedDays : 90
   return {
     rpId: env.RP_ID.trim(),
     origin: env.ORIGIN.trim(),
+    sessionSecret: env.SESSION_SECRET.trim(),
+    sessionDays,
     rpName: env.RP_NAME?.trim() || 'openGym',
     // Unset or blank means registration is closed, never open.
     setupCode: env.SETUP_CODE?.trim() || null,

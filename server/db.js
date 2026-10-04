@@ -3,7 +3,29 @@
 import pg from 'pg'
 
 export function pgAdapter(pool) {
-  return { query: (text, params) => pool.query(text, params), exec: text => pool.query(text), end: () => pool.end() }
+  return {
+    query: (text, params) => pool.query(text, params),
+    exec: text => pool.query(text),
+    end: () => pool.end(),
+    transaction: async fn => {
+      const client = await pool.connect()
+      try {
+        await client.query('BEGIN')
+        const tx = {
+          query: (text, params) => client.query(text, params),
+          exec: text => client.query(text)
+        }
+        const result = await fn(tx)
+        await client.query('COMMIT')
+        return result
+      } catch (err) {
+        await client.query('ROLLBACK')
+        throw err
+      } finally {
+        client.release()
+      }
+    }
+  }
 }
 
 export function connect(connectionString, { max = 3 } = {}) {
