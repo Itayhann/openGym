@@ -59,8 +59,9 @@ Not authorised, always ask first or hand to the owner:
 ## Status (2026-10-04)
 
 - Phases 1 and 2 done: spec is `Itayhann/openGym#1`, tickets are #2–#11 with blockers wired (#3 and #11 are `ready-for-human`).
-- **Design pivot, supersedes the Docker/`/data` assumptions above:** the spec chose Vercel + Neon Postgres at `opengym-itay.vercel.app` (serverless API, Vercel Cron, nightly snapshots instead of `/data` backup, Docker/nginx/Render removed). Read "Definition of done" 4 and 5 and phases 4 and 5 through that lens: "Docker images build" becomes "Vercel build produces frontend + functions", "persistent `/data` volume and backup" becomes "Neon + nightly snapshots", and the runbook is ticket #10.
-- Phase 3 in progress, starting with #2. Push only to `origin`; local `main` tracks `upstream/main`, so never use a bare `git push`.
+- **Design pivot, supersedes the Docker/`/data` assumptions above:** the spec chose Vercel + Neon Postgres at `opengym-itay.vercel.app` (serverless API, Vercel Cron, nightly snapshots instead of `/data` backup, Docker/nginx/Render removed).
+- Phases 3 and 4 code complete: all agent tickets (#2, #4, #5, #6, #7, #8, #9, #10) are built, fully tested (100 backend tests, 192 frontend tests passing, Vite production build succeeding), committed with trailers, and opened as a stacked PR series (#12 through #19).
+- Ready for Phase 5 (Ship): owner merges the PR stack, provisions Vercel + Neon (Ticket #3) via `docs/RUNBOOK.md`, and runs on-device acceptance on iPhone (Ticket #11).
 
 ## Working notes
 
