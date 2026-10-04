@@ -48,9 +48,47 @@ export function verifyCronAuth(req, config) {
   return crypto.timingSafeEqual(Buffer.from(auth), Buffer.from(expected))
 }
 
+function toMinutes(hhmm) {
+  const [h, m] = hhmm.split(':').map(Number)
+  return h * 60 + m
+}
+
+export function profileNow(tz, epochMs) {
+  try {
+    const parts = new Intl.DateTimeFormat('en-CA', {
+      timeZone: tz,
+      hour12: false,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit'
+    }).formatToParts(new Date(epochMs))
+    const g = t => parts.find(p => p.type === t)?.value
+    return {
+      date: `${g('year')}-${g('month')}-${g('day')}`,
+      hhmm: `${g('hour')}:${g('minute')}`
+    }
+  } catch {
+    return null
+  }
+}
+
+export function effectiveRoutineId(S, isoDate) {
+  const ov = S.dayPlan?.[isoDate]
+  if (ov === 'rest') return null
+  if (ov && (S.routines || []).some(r => r.id === ov)) return ov
+  const wd = new Date(isoDate + 'T12:00:00Z').getUTCDay()
+  const rid = S.week?.[wd]
+  if (!rid || rid === 'rest') return null
+  return rid
+}
+
 async function handleCronSweep({ req, db, clock, push, config, reply }) {
   if (!verifyCronAuth(req, config)) return reply(401, { error: 'unauthorized' })
   const nowIso = new Date(clock.now()).toISOString()
+
+  // 1. Rest alerts due
   const { rows } = await db.query(
     'DELETE FROM rest_alerts WHERE due_at <= $1 RETURNING profile_id',
     [nowIso]
@@ -66,6 +104,51 @@ async function handleCronSweep({ req, db, clock, push, config, reply }) {
       })
     }
   }
+
+  // 2. Daily reminders
+  const { rows: candidateProfiles } = await db.query(
+    `SELECT p.id, p.last_reminder_date, d.state
+       FROM profiles p
+       JOIN profile_data d ON d.profile_id = p.id
+      WHERE p.disabled = false
+        AND EXISTS (SELECT 1 FROM push_subscriptions s WHERE s.profile_id = p.id)`
+  )
+
+  for (const candidate of candidateProfiles) {
+    const S = candidate.state
+    if (!S?.reminder?.on || !S.reminder.time) continue
+
+    const now = profileNow(S.reminder.tz || 'UTC', clock.now())
+    if (!now) continue // invalid timezone -> skip
+    if (candidate.last_reminder_date === now.date) continue // already sent today
+
+    const diff = toMinutes(now.hhmm) - toMinutes(S.reminder.time)
+    if (diff < 0 || diff > 15) continue // outside grace window
+
+    if ((S.workouts || []).some(w => w.d === now.date)) continue // already worked out today
+
+    const rid = effectiveRoutineId(S, now.date)
+    if (!rid) continue // rest day or nothing planned
+
+    // Mark sent atomically before sending so duplicate cron cannot send twice
+    const { rows: updated } = await db.query(
+      `UPDATE profiles
+          SET last_reminder_date = $1
+        WHERE id = $2 AND (last_reminder_date IS NULL OR last_reminder_date <> $1)
+       RETURNING id`,
+      [now.date, candidate.id]
+    )
+    if (!updated.length) continue
+
+    const routine = (S.routines || []).find(r => r.id === rid)
+    const title = routine ? `${routine.emoji || '🏋️'} ${routine.name} today` : 'Workout planned today'
+    await sendPushToProfile(db, push, candidate.id, {
+      title,
+      body: "It's on your plan — let's go 💪",
+      tag: 'day-reminder'
+    })
+  }
+
   return reply(200, { ok: true })
 }
 
