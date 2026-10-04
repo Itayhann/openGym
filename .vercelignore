@@ -1,0 +1,8 @@
+media
+website
+assets
+frontend/android
+frontend/ios
+frontend/node_modules
+node_modules
+.dev-db

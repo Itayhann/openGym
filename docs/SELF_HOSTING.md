@@ -1,5 +1,9 @@
 # Self-hosting openGym
 
+> **Not applicable to this fork.** This fork runs on Vercel + Neon Postgres; the Docker, nginx and
+> `data/` setup described below was removed (see `Itayhann/openGym#1`). The guide is kept as the
+> upstream reference only. Deployment notes for this fork will live in `docs/RUNBOOK.md`.
+
 openGym is two small containers (a web server and an API) plus a folder of your data.
 This guide takes you from "just cloned it" to "using it from my phone over the internet".
 
