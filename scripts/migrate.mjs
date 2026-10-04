@@ -4,8 +4,9 @@
 // Reads .env.local if present; DATABASE_URL_UNPOOLED wins over DATABASE_URL.
 import { connect, describeTarget } from '../server/db.js'
 import { migrate } from '../server/migrate.js'
+import { loadLocalEnv } from '../server/runtime.js'
 
-try { process.loadEnvFile('.env.local') } catch { /* no .env.local: use the real environment */ }
+loadLocalEnv()
 const url = process.env.DATABASE_URL_UNPOOLED || process.env.DATABASE_URL
 if (!url) { console.error('Set DATABASE_URL_UNPOOLED (or DATABASE_URL), e.g. via `vercel env pull .env.local`.'); process.exit(1) }
 

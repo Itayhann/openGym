@@ -40,6 +40,13 @@ describe('request handling', () => {
     expect(res.status).toBe(400)
   })
 
+  it('refuses a body that is valid JSON but not an object', async () => {
+    app = await createTestApp()
+    for (const body of ['null', '[]', '"x"', '5']) {
+      expect((await app.request('POST', '/api/logout', { body })).status).toBe(400)
+    }
+  })
+
   it('refuses an oversized body with a clear 413 instead of truncating', async () => {
     app = await createTestApp()
     const res = await app.request('PUT', '/api/data', { body: JSON.stringify({ blob: 'x'.repeat(5 * 1024 * 1024) }) })

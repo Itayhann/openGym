@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { loadConfig } from './env.js'
 
-const base = { RP_ID: 'opengym-itay.vercel.app', ORIGIN: 'https://opengym-itay.vercel.app', DATABASE_URL: 'postgres://x' }
+const base = { RP_ID: 'opengym-itay.vercel.app', ORIGIN: 'https://opengym-itay.vercel.app' }
 
 describe('loadConfig', () => {
   it('reads the relying party and origin from the environment, never from defaults', () => {

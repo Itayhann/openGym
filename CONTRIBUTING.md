@@ -8,31 +8,32 @@ to keep it that way — easy to read, easy to self-host.
 ```
 frontend/  React + Vite app (src/views, src/components, src/store, src/lib). Builds to static files.
            android/ + ios/ are the Capacitor shells for the standalone mobile app (docs/MOBILE.md).
-api/       backend — server.js (Node, no framework), one dependency (@simplewebauthn/server).
-web/       multi-stage Dockerfile (builds frontend → nginx) + nginx.conf (serves app, proxies /api).
-media/     exercise img/gif (gitignored, fetched at runtime).
-docs/      self-hosting guide.
+server/    backend — one request handler (handler.js, routes.js), Postgres migrations, no framework.
+api/       Vercel function entry (index.js): wires real collaborators into the handler.
+scripts/   migrate and local dev API. vercel.json builds the frontend + api together.
+media/     exercise img/gif (served from a pinned CDN in production).
+docs/      deployment and agent docs; SELF_HOSTING.md is the upstream Docker guide, unused in this fork.
 ```
 
 ## Running for development
 
 ```bash
-cp .env.example .env
-docker compose up -d --build      # api + web + media on :8080
-# frontend hot reload:
-cd frontend && npm install && npm run dev
-# training logic (progression rules, 1RM, how a session is read back):
-cd frontend && npm test
+npm install && npm --prefix frontend install
+npm run dev:api                   # API on :3000 (local database in .dev-db/, or DATABASE_URL)
+npm --prefix frontend run dev     # frontend hot reload on :5173, proxies /api
+npm test                          # API tests, through the request handler (server/handler.js)
+npm --prefix frontend test        # training logic (progression rules, 1RM, how a session is read back)
 ```
 
 ## Guidelines
 
 - **Keep it dependency-light.** The frontend uses React + Router + Zustand and nothing else;
-  new deps (front or back) are a hard sell. `api/` has two (`@simplewebauthn/server` for passkeys,
-  `web-push` for notifications) — keep it near that.
+  new deps (front or back) are a hard sell. The backend has three runtime dependencies
+  (`@simplewebauthn/server` for passkeys, `web-push` for notifications, `pg` for Postgres) — keep it
+  near that. Test tooling is dev-only (`vitest`, `@electric-sql/pglite` for in-process Postgres).
 - **Match the style.** Small components, clear names, comments only where the "why" isn't obvious.
   State lives in the Zustand store (`src/store`); pure helpers in `src/lib`.
-- **Don't commit** the exercise media (`media/`) or `data/` — they're gitignored.
+- **Don't commit** the exercise media (`media/`) — it's served from a CDN. Never commit `.env*` files or secrets.
 - **Test the flow** you touched — click through the affected screens (and the workout flow) in a
   browser before opening a PR.
 - **Training logic gets a unit test.** Anything deciding what you lift next, or reading a logged

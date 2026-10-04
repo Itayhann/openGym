@@ -22,17 +22,13 @@ export function fakeClock(start = Date.parse('2026-10-05T08:00:00Z')) {
   let t = start
   return {
     now: () => t,
-    advance: ms => { t += ms },
-    set: ms => { t = ms }
+    advance: ms => { t += ms }
   }
 }
 
 /** Sleep that never waits: it advances the fake clock by the requested time instead. */
 export function fakeSleep(clock) {
-  const calls = []
-  const sleep = async ms => { calls.push(ms); clock.advance(ms) }
-  sleep.calls = calls
-  return sleep
+  return async ms => { clock.advance(ms) }
 }
 
 /** Push sender that records instead of sending. `failWith(statusCode)` makes the next sends reject. */
