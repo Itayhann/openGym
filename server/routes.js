@@ -302,6 +302,29 @@ export const routes = {
     return reply(200, { ok: true })
   },
 
+  'GET /api/data': async ({ req, db, clock, config, reply }) => {
+    const profile = await readSession(req, { db, clock, config })
+    if (!profile) return reply(401, { error: 'not signed in' })
+    const { rows } = await db.query('SELECT state FROM profile_data WHERE profile_id = $1', [profile.id])
+    return reply(200, { state: rows[0]?.state ?? null })
+  },
+
+  'PUT /api/data': async ({ req, db, clock, config, body, reply }) => {
+    const profile = await readSession(req, { db, clock, config })
+    if (!profile) return reply(401, { error: 'not signed in' })
+    if (!body?.state || typeof body.state !== 'object' || Array.isArray(body.state)) {
+      return reply(400, { error: 'state required' })
+    }
+    delete body.state.active
+    await db.query(
+      `INSERT INTO profile_data (profile_id, state, updated_at)
+       VALUES ($1, $2, now())
+       ON CONFLICT (profile_id) DO UPDATE SET state = EXCLUDED.state, updated_at = EXCLUDED.updated_at`,
+      [profile.id, body.state]
+    )
+    return reply(200, { ok: true, ts: body.state._ts || null })
+  },
+
   // Admin routes always refuse: 401 when signed out, 403 when signed in.
   'GET /api/admin/users': refuseAdmin,
   'GET /api/admin/user': refuseAdmin,
