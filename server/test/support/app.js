@@ -61,6 +61,7 @@ async function freshDb() {
 /** `db` may be passed to run the handler over a stand-in, e.g. one that always fails. */
 export async function createTestApp({ config = {}, clock = fakeClock(), db } = {}) {
   db ??= await freshDb()
+  if (!db.transaction) db.transaction = async fn => fn(db)
   const sleep = fakeSleep(clock)
   const push = recordingPush()
   const fullConfig = {
@@ -69,6 +70,8 @@ export async function createTestApp({ config = {}, clock = fakeClock(), db } = {
     origin: TEST_ORIGIN,
     setupCode: null,
     maxProfiles: 1,
+    sessionSecret: 'test-session-secret-at-least-32-chars-long',
+    sessionDays: 90,
     ...config
   }
   const handler = createHandler({ db, clock, sleep, push, config: fullConfig })

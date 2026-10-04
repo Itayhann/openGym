@@ -14,6 +14,7 @@ loadLocalEnv()
 process.env.RP_ID ||= 'localhost'
 process.env.ORIGIN ||= 'http://localhost:5173'
 process.env.SETUP_CODE ||= 'dev-setup-code'
+process.env.SESSION_SECRET ||= 'dev-session-secret-change-in-production'
 const config = loadConfig()
 
 let db
