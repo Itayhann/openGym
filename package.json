@@ -1,0 +1,24 @@
+{
+  "name": "opengym",
+  "private": true,
+  "version": "1.2.4",
+  "type": "module",
+  "license": "AGPL-3.0-or-later",
+  "engines": { "node": ">=20" },
+  "scripts": {
+    "dev:api": "node scripts/dev-api.mjs",
+    "migrate": "node scripts/migrate.mjs",
+    "test": "vitest run",
+    "test:all": "vitest run && npm --prefix frontend test",
+    "build": "npm --prefix frontend run build"
+  },
+  "dependencies": {
+    "@simplewebauthn/server": "^13.1.1",
+    "pg": "^8.13.0",
+    "web-push": "^3.6.7"
+  },
+  "devDependencies": {
+    "@electric-sql/pglite": "^0.3.0",
+    "vitest": "^4.1.10"
+  }
+}
